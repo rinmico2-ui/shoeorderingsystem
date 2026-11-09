@@ -13,12 +13,16 @@ export function signToken(user: { id: string; email: string; role: string }) {
   return jwt.sign({ sub: user.id, email: user.email, role: user.role }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as any })
 }
 
+function isSecureCookie() {
+  return env.COOKIE_SECURE === 'true' || env.NODE_ENV === 'production' || String(env.FRONTEND_URL || '').includes('https://')
+}
+
 export function setAuthCookie(res: Response, token: string) {
-  const secure = env.COOKIE_SECURE === 'true' || env.NODE_ENV === 'production'
+  const secure = isSecureCookie()
   res.cookie(COOKIE, token, { httpOnly: true, sameSite: secure ? 'none' : 'lax', secure, path: '/', maxAge: 86400000 })
 }
 export function clearAuthCookie(res: Response) {
-  const secure = env.COOKIE_SECURE === 'true' || env.NODE_ENV === 'production'
+  const secure = isSecureCookie()
   res.clearCookie(COOKIE, { httpOnly: true, sameSite: secure ? 'none' : 'lax', secure, path: '/' })
 }
 

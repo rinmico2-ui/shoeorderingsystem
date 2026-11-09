@@ -21,10 +21,12 @@ const allowedOrigins = String(env.FRONTEND_URL || '')
   .split(',')
   .map((o) => o.trim().replace(/\/+$/, ''))
   .filter(Boolean)
+const vercelOrigin = /^https:\/\/shoeorderingsystem[-\w.]*\.vercel\.app$/i
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || allowedOrigins.length === 0) return cb(null, true)
-    cb(null, allowedOrigins.includes(origin.replace(/\/+$/, '')))
+    const normalized = origin.replace(/\/+$/, '')
+    cb(null, allowedOrigins.includes(normalized) || vercelOrigin.test(normalized))
   },
   credentials: true,
 }))

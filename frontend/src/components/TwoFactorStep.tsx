@@ -3,7 +3,7 @@ import { ShieldCheck } from 'lucide-react'
 import { api } from '@/services/api'
 import { Field, Input } from './ui'
 
-export function TwoFactorStep({ tempToken, onSuccess, onBack }: { tempToken: string; onSuccess: () => void; onBack: () => void }) {
+export function TwoFactorStep({ tempToken, onSuccess, onBack }: { tempToken: string; onSuccess: (res?: any) => void | Promise<void>; onBack: () => void }) {
   const [code, setCode] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
@@ -12,8 +12,8 @@ export function TwoFactorStep({ tempToken, onSuccess, onBack }: { tempToken: str
     e.preventDefault()
     setErr(''); setLoading(true)
     try {
-      await api.auth.twoFactor.verify({ tempToken, code: code.replace(/\s+/g, '') })
-      onSuccess()
+      const res = await api.auth.twoFactor.verify({ tempToken, code: code.replace(/\s+/g, '') })
+      await onSuccess(res)
     } catch (ex: any) {
       setErr(ex?.data?.error?.message || ex?.message || 'Verification failed')
     } finally { setLoading(false) }

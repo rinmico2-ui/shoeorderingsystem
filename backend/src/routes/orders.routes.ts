@@ -3,7 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { authenticate, optionalAuth, requireRole } from '../middlewares/auth.js'
 import * as c from '../controllers/orders.controller.js'
 export const ordersRouter = Router()
-ordersRouter.post('/', optionalAuth, asyncHandler(c.createOrder))
+ordersRouter.post('/', authenticate, asyncHandler(c.createOrder))
 ordersRouter.post('/lookup', asyncHandler(c.lookupGuestOrders))
 ordersRouter.get('/my', authenticate, asyncHandler(c.myOrders))
 ordersRouter.get('/track/:orderNumber', asyncHandler(c.trackOrder))

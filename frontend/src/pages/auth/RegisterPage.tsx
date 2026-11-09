@@ -1,16 +1,25 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/services/api'
 import { Field, Input } from '@/components/ui'
 
 export function RegisterPage() {
   const nav = useNavigate()
+  const qc = useQueryClient()
   const [form, setForm] = useState({ fullName: '', email: '', password: '', phone: '' })
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setLoading(true)
-    try { await api.auth.register(form); nav('/account') }
+    try {
+      const res = await api.auth.register(form)
+      if (res?.user) {
+        await qc.setQueryData(['me'], res)
+        qc.invalidateQueries({ queryKey: ['me'] })
+      }
+      nav('/account')
+    }
     catch (ex: any) { setErr(ex?.data?.error?.message || ex?.message || 'Registration failed') }
     finally { setLoading(false) }
   }

@@ -11,7 +11,8 @@ const FREE_SHIP = 2500
 export function CartPage() {
   const qc = useQueryClient()
   const toast = useToast()
-  const { data, isLoading, error } = useQuery({ queryKey: ['cart'], queryFn: api.cart.get })
+  const me = useQuery({ queryKey: ['me'], queryFn: api.auth.me, retry: false, refetchOnMount: 'always' })
+  const { data, isLoading, error } = useQuery({ queryKey: ['cart'], queryFn: api.cart.get, enabled: !!me.data?.user })
   const items = data?.data?.items || []
   const subtotal = items.reduce((s: number, it: any) => s + Number(it.variant?.price ?? it.variant?.product?.basePrice ?? 0) * it.quantity, 0)
   const progress = Math.min(100, (subtotal / FREE_SHIP) * 100)
@@ -26,6 +27,19 @@ export function CartPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cart'] }),
     onError: (e: any) => toast(e?.message || 'Could not update quantity', 'error'),
   })
+
+  if (me.isLoading || (me.isFetching && !me.data)) return <div className="container-page space-y-4 py-10">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-24 rounded-md" />)}</div>
+  if (!me.data?.user) {
+    if (me.isError && (me.error as any)?.status !== 401) {
+      return <div className="container-page py-10"><EmptyState icon={<ShoppingBag size={28} />} title="Could not load your bag" description={(me.error as Error)?.message || 'Something went wrong. Try again.'} action={<button onClick={() => me.refetch()} className="btn-primary">Retry</button>} /></div>
+    }
+    return (
+      <div className="container-page py-10">
+        <h1 className="mb-2 font-heading text-2xl font-bold sm:text-3xl">Shopping Bag</h1>
+        <EmptyState icon={<ShoppingBag size={28} />} title="Sign in to view your bag" description="You need to be signed in to add shoes to your bag and check out." action={<div className="flex gap-2"><Link to="/login?next=%2Fcart" className="btn-primary">Sign In</Link><Link to="/register" className="btn-secondary">Create Account</Link></div>} />
+      </div>
+    )
+  }
 
   if (isLoading) return <div className="container-page space-y-4 py-10">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-24 rounded-md" />)}</div>
   if (error) return <div className="container-page py-10 text-sm text-error">Could not load bag. {(error as Error).message}</div>

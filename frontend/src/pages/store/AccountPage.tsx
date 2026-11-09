@@ -12,7 +12,9 @@ export function AccountPage() {
   const qc = useQueryClient()
   const toast = useToast()
   const [view, setView] = useState<'main' | 'addresses' | 'notifications' | 'security'>('main')
-  const me = useQuery({ queryKey: ['me'], queryFn: api.auth.me, retry: false })
+  // Always re-check the session on mount — never trust a stale cached
+  // "guest" (401) result carried over from before a successful sign-in.
+  const me = useQuery({ queryKey: ['me'], queryFn: api.auth.me, retry: false, refetchOnMount: 'always' })
   const orders = useQuery({ queryKey: ['myOrders'], queryFn: api.orders.my, enabled: !!me.data?.user, retry: false })
   const addresses = useQuery({ queryKey: ['addresses'], queryFn: api.account.addresses, enabled: !!me.data?.user && view === 'addresses', retry: false })
   const notifications = useQuery({ queryKey: ['notifications'], queryFn: api.account.notifications, enabled: !!me.data?.user && view === 'notifications', retry: false })
@@ -20,15 +22,34 @@ export function AccountPage() {
   const [addrForm, setAddrForm] = useState({ label: '', fullName: '', phone: '', city: '', street: '', isDefault: false })
   const [savingAddr, setSavingAddr] = useState(false)
 
-  if (me.isLoading) return <div className="container-page space-y-4 py-10"><div className="skeleton h-20 w-full" /><div className="skeleton h-40 w-full" /></div>
-  if (!me.data?.user) return (
-    <div className="container-page py-10">
-      <EmptyState icon={<User size={28} />} title="Welcome to Khyleene's Collection" description="Sign in to track orders, manage your wishlist, and check out faster." action={<div className="flex gap-2"><Link to="/login" className="btn-primary">Sign In</Link><Link to="/register" className="btn-secondary">Create Account</Link></div>} />
-    </div>
-  )
+  if (me.isLoading || (me.isFetching && !me.data)) return <div className="container-page space-y-4 py-10"><div className="skeleton h-20 w-full" /><div className="skeleton h-40 w-full" /></div>
+  if (!me.data?.user) {
+    // Genuine 401 = signed out. Any other failure (network/CORS/server)
+    // is NOT a sign-out — offer a retry instead of the sign-in prompt.
+    if (me.isError && (me.error as any)?.status !== 401) {
+      return (
+        <div className="container-page py-10">
+          <EmptyState icon={<User size={28} />} title="Could not load your account" description={(me.error as Error)?.message || 'Something went wrong. Check your connection and try again.'} action={<div className="flex gap-2"><button onClick={() => me.refetch()} className="btn-primary">Retry</button><Link to="/" className="btn-secondary">Go Home</Link></div>} />
+        </div>
+      )
+    }
+    return (
+      <div className="container-page py-10">
+        <EmptyState icon={<User size={28} />} title="Welcome to Khyleene's Collection" description="Sign in to track orders, manage your wishlist, and check out faster." action={<div className="flex gap-2"><Link to="/login" className="btn-primary">Sign In</Link><Link to="/register" className="btn-secondary">Create Account</Link></div>} />
+      </div>
+    )
+  }
 
   const u = me.data.user
-  const logout = async () => { try { await api.auth.logout() } catch {} nav('/') }
+  const logout = async () => {
+    try { await api.auth.logout() } catch {}
+    qc.removeQueries({ queryKey: ['me'] })
+    qc.removeQueries({ queryKey: ['myOrders'] })
+    qc.removeQueries({ queryKey: ['cart'] })
+    qc.removeQueries({ queryKey: ['wishlist'] })
+    qc.invalidateQueries({ queryKey: ['me'] })
+    nav('/')
+  }
 
   const saveAddress = async (e: React.FormEvent) => {
     e.preventDefault(); setSavingAddr(true)

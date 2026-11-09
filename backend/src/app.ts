@@ -11,7 +11,23 @@ export const app = express()
 
 app.set('trust proxy', 1)
 app.use(helmet())
-app.use(cors({ origin: env.FRONTEND_URL, credentials: true }))
+
+// CORS: allow credentialed cross-site cookie auth from the storefront.
+// FRONTEND_URL may hold multiple origins separated by commas (e.g. the
+// Vercel URL + a custom domain); trailing slashes are ignored so a
+// value mis-set as "https://shop.example.com/" still matches the Origin
+// header (which never carries a trailing slash).
+const allowedOrigins = String(env.FRONTEND_URL || '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.length === 0) return cb(null, true)
+    cb(null, allowedOrigins.includes(origin.replace(/\/+$/, '')))
+  },
+  credentials: true,
+}))
 app.use('/api/v1/payments/webhook', express.raw({ type: 'application/json' }))
 app.use(express.json({ limit: '1mb' }))
 app.use(cookieParser())

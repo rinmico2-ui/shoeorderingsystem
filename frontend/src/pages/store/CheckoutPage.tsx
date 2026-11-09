@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import { Check, ChevronLeft, ChevronRight, LocateFixed } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Check, ChevronLeft, ChevronRight, LocateFixed, ShoppingBag } from 'lucide-react'
 import { api } from '@/services/api'
 import { fmt } from '@/utils/format'
-import { Button, Field, Input } from '@/components/ui'
+import { Button, EmptyState, Field, Input } from '@/components/ui'
 import { useToast } from '@/contexts/ToastContext'
 import { DeliveryMap } from '@/components/DeliveryMap'
 import { AddressSearch } from '@/components/AddressSearch'
@@ -30,7 +30,8 @@ export function CheckoutPage() {
   const nav = useNavigate()
   const qc = useQueryClient()
   const toast = useToast()
-  const { data, isLoading } = useQuery({ queryKey: ['cart'], queryFn: api.cart.get })
+  const me = useQuery({ queryKey: ['me'], queryFn: api.auth.me, retry: false, refetchOnMount: 'always' })
+  const { data, isLoading } = useQuery({ queryKey: ['cart'], queryFn: api.cart.get, enabled: !!me.data?.user })
   const items = data?.data?.items || []
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<FormState>(loadDraft)
@@ -129,6 +130,19 @@ export function CheckoutPage() {
     onError: (e: any) => toast(e?.data?.error?.message || e?.message || 'Could not place order', 'error'),
   })
 
+  if (me.isLoading || (me.isFetching && !me.data)) return <div className="container-page space-y-4 py-10"><div className="skeleton h-8 w-1/3" /><div className="skeleton h-64 w-full" /></div>
+  if (!me.data?.user) {
+    if (me.isError && (me.error as any)?.status !== 401) {
+      return <div className="container-page py-10"><EmptyState icon={<ShoppingBag size={28} />} title="Could not load checkout" description={(me.error as Error)?.message || 'Something went wrong. Try again.'} action={<button onClick={() => me.refetch()} className="btn-primary">Retry</button>} /></div>
+    }
+    return (
+      <div className="container-page py-10">
+        <h1 className="mb-4 font-heading text-2xl font-bold sm:text-3xl">Checkout</h1>
+        <EmptyState icon={<ShoppingBag size={28} />} title="Sign in to check out" description="You need to be signed in to add shoes to your bag and check out." action={<div className="flex gap-2"><Link to="/login?next=%2Fcheckout" className="btn-primary">Sign In</Link><Link to="/register" className="btn-secondary">Create Account</Link></div>} />
+      </div>
+    )
+  }
+
   if (isLoading) return <div className="container-page space-y-4 py-10"><div className="skeleton h-8 w-1/3" /><div className="skeleton h-64 w-full" /></div>
   if (!items.length) return <div className="container-page py-10 text-sm">Your bag is empty. <button className="font-semibold text-brand-taupe" onClick={() => nav('/shop')}>Shop now</button></div>
 
@@ -153,7 +167,7 @@ export function CheckoutPage() {
           {step === 0 && (
             <section className="card space-y-4 p-5" aria-label="Customer information">
               <h2 className="font-heading font-bold">1. Customer Information</h2>
-              <p className="text-xs text-ink-secondary">Checking out as a guest — no account needed. Just add your email below so we can send your order updates.</p>
+              <p className="text-xs text-ink-secondary">Signed in as {me.data?.user?.email}. We’ll send order updates to the email below.</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Full name" error={touched.fullName ? errors.fullName : undefined} htmlFor="co-name"><Input id="co-name" autoComplete="name" value={form.fullName} onChange={(e) => set('fullName', e.target.value)} onBlur={() => setTouched((t) => ({ ...t, fullName: true }))} required /></Field>
                 <Field label="Email" error={touched.email ? errors.email : undefined} htmlFor="co-email"><Input id="co-email" type="email" inputMode="email" autoComplete="email" value={form.email} onChange={(e) => set('email', e.target.value)} onBlur={() => setTouched((t) => ({ ...t, email: true }))} required /></Field>

@@ -15,6 +15,8 @@ export function ProductPage() {
   const qc = useQueryClient()
   const toast = useToast()
   const { data, isLoading, error } = useQuery({ queryKey: ['product', slug], queryFn: () => api.products.get(slug) })
+  const me = useQuery({ queryKey: ['me'], queryFn: api.auth.me, retry: false, staleTime: 60_000 })
+  const isLoggedIn = !!me.data?.user
   const p = data?.data
   const [color, setColor] = useState('')
   const [size, setSize] = useState('')
@@ -163,11 +165,18 @@ export function ProductPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <QuantityStepper value={qty} max={Math.max(1, stock)} disabled={!variant || stock < 1} onChange={setQty} />
-              <button className="btn-primary flex-1 sm:flex-none sm:px-8" disabled={!variant || stock < 1 || add.isPending} onClick={() => add.mutate({ buyNow: false })}>
+              <QuantityStepper value={qty} max={Math.max(1, stock)} disabled={!variant || stock < 1 || !isLoggedIn} onChange={setQty} />
+              <button className="btn-primary flex-1 sm:flex-none sm:px-8" disabled={!variant || stock < 1 || !isLoggedIn || add.isPending} onClick={() => add.mutate({ buyNow: false })}>
                 {add.isPending ? 'Adding…' : 'Add to Bag'}
               </button>
             </div>
+            {!isLoggedIn && !me.isLoading && (
+              <div className="rounded-md border border-brand-border bg-brand-ivory p-3 text-sm">
+                <span className="font-medium">Sign in to add shoes to your bag.</span>{' '}
+                <Link to={`/login?next=${encodeURIComponent(`/products/${slug}`)}`} className="font-semibold text-brand-taupe hover:underline">Sign in</Link>
+                <span className="text-ink-secondary"> to continue shopping.</span>
+              </div>
+            )}
             {add.isError && <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-error">{(add.error as any)?.message || 'Could not add to bag.'}</div>}
 
             <div className="rounded-md bg-brand-ivory p-4 text-xs text-brand-charcoal/75">
@@ -206,10 +215,10 @@ export function ProductPage() {
         <div className="flex items-center gap-3">
           <div className="min-w-0">
             <div className="font-heading text-base font-bold">{fmt(price)}</div>
-            <div className="truncate text-[11px] text-ink-secondary">{needsSelection ? 'Select color & size' : stock > 0 ? `In stock (${stock})` : 'Out of stock'}</div>
+            <div className="truncate text-[11px] text-ink-secondary">{!isLoggedIn && !me.isLoading ? 'Sign in to add to bag' : needsSelection ? 'Select color & size' : stock > 0 ? `In stock (${stock})` : 'Out of stock'}</div>
           </div>
-          <button className="btn-secondary flex-1" disabled={!variant || stock < 1 || add.isPending} onClick={() => add.mutate({ buyNow: false })}>Add to Bag</button>
-          <button className="btn-primary flex-1" disabled={!variant || stock < 1 || add.isPending} onClick={() => add.mutate({ buyNow: true })}>{add.isPending ? 'Adding…' : 'Buy Now'}</button>
+          <button className="btn-secondary flex-1" disabled={!variant || stock < 1 || !isLoggedIn || add.isPending} onClick={() => add.mutate({ buyNow: false })}>Add to Bag</button>
+          <button className="btn-primary flex-1" disabled={!variant || stock < 1 || !isLoggedIn || add.isPending} onClick={() => add.mutate({ buyNow: true })}>{add.isPending ? 'Adding…' : 'Buy Now'}</button>
         </div>
       </div>
 

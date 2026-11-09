@@ -1,28 +1,35 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/services/api'
 import { Field, Input } from '@/components/ui'
 import { TwoFactorStep } from '@/components/TwoFactorStep'
 
 export function AdminLoginPage() {
   const nav = useNavigate()
+  const qc = useQueryClient()
   const [form, setForm] = useState({ email: '', password: '' })
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [tempToken, setTempToken] = useState<string | null>(null)
+
+  const onAuthed = async (res: any) => {
+    if (res?.user?.role === 'CUSTOMER') { setErr('Admin/staff account required.'); return }
+    if (res?.user) { await qc.setQueryData(['me'], res); qc.invalidateQueries({ queryKey: ['me'] }) }
+    nav('/admin')
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setLoading(true)
     try {
       const res = await api.auth.login(form)
       if (res?.requires2fa && res?.tempToken) { setTempToken(res.tempToken); return }
-      if (res.user?.role === 'CUSTOMER') setErr('Admin/staff account required.')
-      else nav('/admin')
+      await onAuthed(res)
     } catch (ex: any) { setErr(ex?.data?.error?.message || ex?.message || 'Login failed') }
     finally { setLoading(false) }
   }
 
-  if (tempToken) return <TwoFactorStep tempToken={tempToken} onSuccess={() => nav('/admin')} onBack={() => setTempToken(null)} />
+  if (tempToken) return <TwoFactorStep tempToken={tempToken} onSuccess={onAuthed} onBack={() => setTempToken(null)} />
 
   return (
     <div className="card p-6">

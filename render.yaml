@@ -1,0 +1,21 @@
+# Render Blueprint — one-click backend deploy (Node / Express API)
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: khyleenes-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: FRONTEND_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
